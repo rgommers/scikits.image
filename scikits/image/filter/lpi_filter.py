@@ -3,7 +3,7 @@
 :license: modified BSD
 """
 
-__all__ = ['inverse', 'wiener', 'LPIFilter2D']
+__all__ = ['forward', 'inverse', 'wiener', 'LPIFilter2D']
 __docformat__ = 'restructuredtext en'
 
 import numpy as np
@@ -200,6 +200,7 @@ def forward(data, impulse_response=None, filter_params={},
     if predefined_filter is None:
         predefined_filter = LPIFilter2D(impulse_response, **filter_params)
     return predefined_filter(data)
+
 
 def inverse(data, impulse_response=None, filter_params={}, max_gain=2,
             predefined_filter=None):
