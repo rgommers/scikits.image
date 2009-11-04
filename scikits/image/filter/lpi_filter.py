@@ -12,12 +12,32 @@ from scipy.fftpack import fftshift, ifftshift
 eps = np.finfo(float).eps
 
 def _min_limit(x, val=eps):
+    """Set array values smaller than val to val."""
     mask = np.abs(x) < eps
     x[mask] = np.sign(x[mask]) * eps
 
 def _centre(x, oshape):
     """Return an array of oshape from the centre of x.
 
+    Parameters
+    ----------
+    x : ndarray
+        The data array, 2-dimensional.
+    oshape : tuple
+        Shape tuple, with two elements. This defines the shape of the returned
+        array.
+
+    Returns
+    -------
+    out : ndarray
+        The output array, of shape `oshape`, with values from the center of
+        `x`.
+
+    Examples
+    --------
+    >>> _centre(np.arange(20).reshape(5, 4), (2, 2))
+    array([[10, 11],
+           [14, 15]])
     """
     start = (np.array(x.shape) - np.array(oshape)) / 2. + 1
     out = x[[slice(s, s + n) for s, n in zip(start, oshape)]]
@@ -28,10 +48,16 @@ def _pad(data, shape):
 
     Parameters
     ----------
-    data : 2-d ndarray
-        Input data
-    shape : (2,) tuple
+    data : ndarray
+        Input data, has to be 2-dimensional.
+    shape : tuple
+        Shape tuple, containing two elements, which are the desired sizes of
+        each dimension after padding.
 
+    Returns
+    -------
+    out : ndarray
+        Output array, the input padded to `shape`.
     """
     out = np.zeros(shape)
     out[[slice(0, n) for n in data.shape]] = data
@@ -42,35 +68,31 @@ def _pad(data, shape):
 class LPIFilter2D(object):
     """Linear Position-Invariant Filter (2-dimensional)
 
+    Parameters
+    ----------
+    impulse_response : callable ``f(r, c, **filter_params)``
+        Function that yields the impulse response.  `r` and
+        `c` are 1-dimensional vectors that represent row and
+        column positions, in other words coordinates are
+        (r[0],c[0]),(r[0],c[1]) etc.  `**filter_params` are
+        passed through.
+
+        In other words, the example would be called like this:
+
+        >>> r = [0,0,0,1,1,1,2,2,2]
+        >>> c = [0,1,2,0,1,2,0,1,2]
+        >>> impulse_response(r, c, **filter_params)
+
+    Examples
+    --------
+    To define a spherical Gaussian filter, we do:
+
+    >>> def filt_func(r, c):
+            return np.exp(-(r**2 + c**2)/1.)
+
+    >>> filter = LPIFilter2D(filt_func)
     """
     def __init__(self, impulse_response, **filter_params):
-        """
-        Parameters
-        ----------
-        impulse_response : callable `f(r, c, **filter_params)`
-            Function that yields the impulse response.  `r` and
-            `c` are 1-dimensional vectors that represent row and
-            column positions, in other words coordinates are
-            (r[0],c[0]),(r[0],c[1]) etc.  `**filter_params` are
-            passed through.
-
-            In other words, example would be called like this:
-
-            >>> r = [0,0,0,1,1,1,2,2,2]
-            >>> c = [0,1,2,0,1,2,0,1,2]
-            >>> impulse_response(r, c, **filter_params)
-
-        Examples
-        --------
-
-        Gaussian filter:
-
-        >>> def filt_func(r, c):
-                return np.exp(-np.hypot(r, c)/1)
-
-        >>> filter = LPIFilter2D(filt_func)
-
-        """
         if impulse_response is None:
             raise ValueError("Impulse response must be a callable.")
 
@@ -81,6 +103,23 @@ class LPIFilter2D(object):
     def _prepare(self, data):
         """Calculate filter and data FFT in preparation for filtering.
 
+        Parameters
+        ----------
+        data : ndarray
+            The input array, of shape ``(M, N)``.
+
+        Returns
+        -------
+        F : ndarray
+            The filter in Fourier space, i.e. the Fourier-transformed impulse
+            response evaluated at the data coordinates.
+        G : ndarray
+            The Fourier-transformed input data, of shape ``(2*M-1, 2*N-1)``.
+
+        Notes
+        -----
+        `F` is cached, so for input data of the same shape repeated filtering
+        is fast.
         """
         dshape = np.array(data.shape)
         dshape += (dshape % 2 == 0) # all filter dimensions must be uneven
@@ -108,17 +147,24 @@ class LPIFilter2D(object):
 
         return F, G
 
-    def __call__(self,data):
+    def __call__(self, data):
         """Apply the filter to the given data.
 
-        *Parameters*:
-            data : (M,N) ndarray
+        Parameters
+        ----------
+        data : ndarray
+            The input array, of shape ``(M, N)``.
 
+        Returns
+        -------
+        out : ndarray
+            The filtered input.
         """
         F, G = self._prepare(data)
         out = np.dual.ifftn(F * G)
         out = np.abs(_centre(out, data.shape))
         return out
+
 
 def forward(data, impulse_response=None, filter_params={},
             predefined_filter=None):
@@ -128,7 +174,7 @@ def forward(data, impulse_response=None, filter_params={},
     ----------
     data : (M,N) ndarray
         Input data.
-    impulse_response : callable `f(r, c, **filter_params)`
+    impulse_response : callable ``f(r, c, **filter_params)``
         Impulse response of the filter.  See LPIFilter2D.__init__.
     filter_params : dict
         Additional keyword parameters to the impulse_response function.
