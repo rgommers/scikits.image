@@ -70,18 +70,38 @@ class LPIFilter2D(object):
 
     Parameters
     ----------
-    impulse_response : callable ``f(r, c, **filter_params)``
-        Function that yields the impulse response.  `r` and
-        `c` are 1-dimensional vectors that represent row and
-        column positions, in other words coordinates are
-        (r[0],c[0]),(r[0],c[1]) etc.  `**filter_params` are
-        passed through.
+    impulse_response : callable or ndarray
+        If a callable, has to have signature ``f(r, c, **filter_params)`` and
+        be a function that yields the impulse response.  `r` and `c` are
+        1-dimensional vectors that represent row and column positions, in other
+        words coordinates are (r[0],c[0]),(r[0],c[1]) etc.  `**filter_params`
+        are passed through.  In other words, the example would be called like
+        this::
 
-        In other words, the example would be called like this:
+            r = [0,0,0,1,1,1,2,2,2]
+            c = [0,1,2,0,1,2,0,1,2]
+            impulse_response(r, c, **filter_params)
 
-        >>> r = [0,0,0,1,1,1,2,2,2]
-        >>> c = [0,1,2,0,1,2,0,1,2]
-        >>> impulse_response(r, c, **filter_params)
+        If an ndarray, `impulse_response` has to be 2-dimensional and contain
+        the filter kernel.
+    kernel_shape : tuple, optional
+        Shape tuple for the kernel. Determines the size of the kernel extracted
+        from `impulse_response` if that is a callable. If `impulse_response` is
+        an ndarray, `kernel_shape` is ignored.
+    filter_params : dict, optional
+        The extra parameters passed to `impulse_response` if that is a
+        callable.
+
+    Attributes
+    ----------
+    impulse_response : callable or ndarray
+        Holds the `impulse_response` parameter. If modified, the user has to
+        keep in mind that repeated calling with the same data shape can result
+        in the cache containing the old impulse response result.
+    kernel_shape : ndarray or None
+        Holds the `kernel_shape` parameter. Can be modified.
+    filter_params : dict
+        The parameters passed to `impulse_response` if it is a callable.
 
     Examples
     --------
@@ -92,11 +112,12 @@ class LPIFilter2D(object):
 
     >>> filter = LPIFilter2D(filt_func)
     """
-    def __init__(self, impulse_response, **filter_params):
+    def __init__(self, impulse_response, kernel_shape=None, **filter_params):
         if impulse_response is None:
             raise ValueError("Impulse response must be a callable.")
 
         self.impulse_response = impulse_response
+        self.kernel_shape = kernel_shape
         self.filter_params = filter_params
         self._cache = None
 
